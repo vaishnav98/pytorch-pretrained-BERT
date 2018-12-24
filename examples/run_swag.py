@@ -48,6 +48,12 @@ class SwagExample(object):
                  ending_1,
                  ending_2,
                  ending_3,
+                 ending_4,
+                 ending_5,
+                 ending_6,
+                 ending_7,
+                 ending_8,
+                 ending_9,
                  label = None):
         self.swag_id = swag_id
         self.context_sentence = context_sentence
@@ -57,6 +63,12 @@ class SwagExample(object):
             ending_1,
             ending_2,
             ending_3,
+            ending_4,
+            ending_5,
+            ending_6,
+            ending_7,
+            ending_8,
+            ending_9
         ]
         self.label = label
 
@@ -72,6 +84,12 @@ class SwagExample(object):
             f"ending_1: {self.endings[1]}",
             f"ending_2: {self.endings[2]}",
             f"ending_3: {self.endings[3]}",
+            f"ending_4: {self.endings[4]}",
+            f"ending_5: {self.endings[5]}",
+            f"ending_6: {self.endings[6]}",
+            f"ending_7: {self.endings[7]}",
+            f"ending_8: {self.endings[8]}",
+            f"ending_9: {self.endings[9]}",
         ]
 
         if self.label is not None:
@@ -101,27 +119,28 @@ class InputFeatures(object):
 
 def read_swag_examples(input_file, is_training):
     with open(input_file, 'r', encoding='utf-8') as f:
-        reader = csv.reader(f)
+        reader = csv.reader(f,delimiter='\t')
         lines = list(reader)
-
-    if is_training and lines[0][-1] != 'label':
-        raise ValueError(
-            "For training, the input file must contain a label column."
-        )
-
+        
     examples = [
         SwagExample(
-            swag_id = line[2],
-            context_sentence = line[4],
-            start_ending = line[5], # in the swag dataset, the
+            swag_id = lines[j][0],
+            context_sentence = lines[j][1],
+            start_ending = lines[j][1], # in the swag dataset, the
                                          # common beginning of each
                                          # choice is stored in "sent2".
-            ending_0 = line[7],
-            ending_1 = line[8],
-            ending_2 = line[9],
-            ending_3 = line[10],
-            label = int(line[11]) if is_training else None
-        ) for line in lines[1:] # we skip the line with the column names
+            ending_0 = lines[j][2],
+            ending_1 = lines[j+1][2],
+            ending_2 = lines[j+2][2],
+            ending_3 = lines[j+3][2],
+            ending_4 = lines[j+4][2],
+            ending_5 = lines[j+5][2],
+            ending_6 = lines[j+6][2],
+            ending_7 = lines[j+7][2],
+            ending_8 = lines[j+8][2],             
+            ending_9 = lines[j+9][2],          
+            label = (int(lines[j][3])*0+int(lines[j+1][3])*1+int(lines[j+2][3])*2+int(lines[j+3][3])*3+int(lines[j+4][3])*4+int(lines[j+5][3])*5+int(lines[j+6][3])*6+int(lines[j+7][3])*7+int(lines[j+8][3])*8+int(lines[j+9][3])*9) if is_training else None
+        ) for j in range(0,len(lines),10) # we skip the line with the column names
     ]
 
     return examples
@@ -360,14 +379,14 @@ def main():
     train_examples = None
     num_train_steps = None
     if args.do_train:
-        train_examples = read_swag_examples(os.path.join(args.data_dir, 'train.csv'), is_training = True)
+        train_examples = read_swag_examples(os.path.join(args.data_dir, 'train.tsv'), is_training = True)
         num_train_steps = int(
             len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
     # Prepare model
     model = BertForMultipleChoice.from_pretrained(args.bert_model,
         cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(args.local_rank),
-        num_choices=4)
+        num_choices=10)
     if args.fp16:
         model.half()
     model.to(device)
@@ -478,11 +497,11 @@ def main():
     model_state_dict = torch.load(output_model_file)
     model = BertForMultipleChoice.from_pretrained(args.bert_model,
         state_dict=model_state_dict,
-        num_choices=4)
+        num_choices=10)
     model.to(device)
 
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        eval_examples = read_swag_examples(os.path.join(args.data_dir, 'val.csv'), is_training = True)
+        eval_examples = read_swag_examples(os.path.join(args.data_dir, 'eval.tsv'), is_training = True)
         eval_features = convert_examples_to_features(
             eval_examples, tokenizer, args.max_seq_length, True)
         logger.info("***** Running evaluation *****")
